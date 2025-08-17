@@ -1,81 +1,68 @@
-// Star Menu Script — v1.1
-// Делает поповер у звезды и переносит в него кнопки действий.
-// ВЫЗОВ: initStarMenu({
-//   star:   '#heroStar',         // селектор кнопки со звездой
-//   menu:   '#starMenu',         // селектор контейнера поповера
-//   slot:   '#starActions',      // селектор места, куда класть кнопки
-//   actions:['#btnNewHero','#btnExport','#btnImport'], // селекторы переносимых узлов
-//   offset: 8                    // отступ от звезды, px
-// })
-
 (function(){
-  function initStarMenu({
-    star = '#heroStar',
-    menu = '#starMenu',
-    slot = '#starActions',
-    actions = ['#btnNewHero','#btnExport','#btnImport'],
-    offset = 8
-  } = {}){
-    const starEl = document.querySelector(star) || document.querySelector('.hero .star, .starbtn');
-    const menuEl = document.querySelector(menu);
-    const slotEl = document.querySelector(slot);
-    if (!starEl || !menuEl || !slotEl) return;
+  // 1) Опоры
+  const star = document.getElementById('heroStar') || document.querySelector('.hero .star, .starbtn');
+  const menu = document.getElementById('starMenu');
+  const slot = menu?.querySelector('#starActions');
 
-    // Переносим существующие элементы (сохраняются все обработчики)
-    actions.forEach(sel => {
-      const el = document.querySelector(sel);
-      if (el) slotEl.appendChild(el);
-    });
+  if (!star || !menu || !slot) return;
 
-    function openMenu(){
-      positionMenu();
-      menuEl.hidden = false;
-      starEl.setAttribute('aria-expanded','true');
-      document.addEventListener('click', onDocClick, true);
-      document.addEventListener('keydown', onKeyDown);
-    }
-    function closeMenu(){
-      menuEl.hidden = true;
-      starEl.setAttribute('aria-expanded','false');
-      document.removeEventListener('click', onDocClick, true);
-      document.removeEventListener('keydown', onKeyDown);
-    }
-    function onDocClick(e){ if (!menuEl.contains(e.target) && e.target !== starEl) closeMenu(); }
-    function onKeyDown(e){ if (e.key === 'Escape') closeMenu(); }
+  // 2) Перемещаем (!) существующие узлы (сохранятся обработчики)
+  const ids = ['btnNewHero','btnExport','btnImport']; // подставь свои id
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) slot.appendChild(el);
+  });
 
-    function positionMenu(){
-      const wasHidden = menuEl.hidden;
-      if (wasHidden) { menuEl.hidden = false; menuEl.style.visibility = 'hidden'; }
+  // 3) Тогглер
+  star.addEventListener('click', (e)=>{ e.stopPropagation(); openMenu(); });
 
-      const r  = starEl.getBoundingClientRect();
-      const vw = Math.max(document.documentElement.clientWidth,  window.innerWidth  || 0);
-      const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-      const w = menuEl.offsetWidth;
-      const h = menuEl.offsetHeight;
+  function openMenu(){
+    positionMenu();
+    menu.hidden = false;
+    star.setAttribute('aria-expanded','true');
+    document.addEventListener('click', onDocClick, true);
+    document.addEventListener('keydown', onKeyDown);
+  }
+  function closeMenu(){
+    menu.hidden = true;
+    star.setAttribute('aria-expanded','false');
+    document.removeEventListener('click', onDocClick, true);
+    document.removeEventListener('keydown', onKeyDown);
+  }
+  function onDocClick(e){
+    if (!menu.contains(e.target) && e.target !== star) closeMenu();
+  }
+  function onKeyDown(e){ if (e.key === 'Escape') closeMenu(); }
 
-      let left = r.right - w + window.scrollX;   // по правому краю звезды
-      let top  = r.bottom + offset + window.scrollY;  // под звездой
+  // 4) Позиционирование около звезды с автопереворотом
+  function positionMenu(){
+    // чтобы корректно считать размеры, уберём hidden на момент измерений
+    const wasHidden = menu.hidden;
+    if (wasHidden) { menu.hidden = false; menu.style.visibility = 'hidden'; }
 
-      left = Math.max(8 + window.scrollX, Math.min(left, vw - w - 8 + window.scrollX));
-      if (top + h > window.scrollY + vh) top = r.top - h - offset + window.scrollY; // переворот вверх
+    const r = star.getBoundingClientRect();
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
 
-      menuEl.style.left = left + 'px';
-      menuEl.style.top  = top  + 'px';
+    const w = menu.offsetWidth;
+    const h = menu.offsetHeight;
 
-      if (wasHidden) { menuEl.style.visibility = ''; menuEl.hidden = true; }
-    }
+    let left = r.right - w + window.scrollX;   // выравниваем по правому краю звезды
+    let top  = r.bottom + 8 + window.scrollY;  // ниже звезды
 
-    function reposition(){ if (!menuEl.hidden) positionMenu(); }
+    // если не влезает справа/слева — сдвигаем
+    left = Math.max(8 + window.scrollX, Math.min(left, vw - w - 8 + window.scrollX));
+    // если не влезает вниз — показываем над звездой
+    if (top + h > window.scrollY + vh) top = r.top - h - 8 + window.scrollY;
 
-    starEl.addEventListener('click', (e)=>{ e.stopPropagation(); openMenu(); });
-    window.addEventListener('resize', reposition, {passive:true});
-    window.addEventListener('scroll', reposition, {passive:true});
+    menu.style.left = left + 'px';
+    menu.style.top  = top  + 'px';
 
-    return { open: openMenu, close: closeMenu, position: positionMenu };
+    if (wasHidden) { menu.style.visibility = ''; menu.hidden = true; }
   }
 
-  // Экспорт в глобальную область и автозапуск после загрузки DOM
-  window.initStarMenu = initStarMenu;
-  document.addEventListener('DOMContentLoaded', ()=> initStarMenu());
+  // 5) Перепозиционирование при ресайзе/скролле, если открыт
+  const rev = () => { if (!menu.hidden) positionMenu(); };
+  window.addEventListener('resize', rev, {passive:true});
+  window.addEventListener('scroll', rev, {passive:true});
 })();
-
